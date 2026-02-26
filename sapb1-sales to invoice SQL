@@ -1,0 +1,71 @@
+WITH PedidosCTE AS (
+    SELECT
+        CASE WHEN Fatura.DocEntry IS NOT NULL THEN 'Sim' ELSE 'Não' END AS "Contem Fatura",
+        Pedido.DocNum AS "No. Pedido",
+        Pedido.DocDate AS "Data Pedido",
+        Item.ItemCode AS "Código do Item",
+        
+        CASE
+            WHEN Item.InvntryUom = 'PC' THEN CAST(CAST(ISNULL(Linha.Quantity, 0) AS INT) AS NVARCHAR(50)) + ' PC'
+            WHEN Item.InvntryUom = 'KG' THEN REPLACE(CAST(CAST(ISNULL(Linha.Quantity, 0) AS DECIMAL(18,2)) AS VARCHAR(50)), '.', ',') + ' kg'
+            WHEN Item.InvntryUom = 'M' THEN REPLACE(CAST(CAST(ISNULL(Linha.Quantity, 0) AS DECIMAL(18,3)) AS VARCHAR(50)), '.', ',') + ' m'
+            ELSE CAST(ISNULL(Linha.Quantity, 0) AS NVARCHAR(50)) + ' ' + ISNULL(Item.InvntryUom, '')
+        END AS "Quantidade Ped",
+        
+        CASE
+            WHEN Item.InvntryUom = 'PC' THEN CAST(CAST(ISNULL(Fatura.Quantity, 0) AS INT) AS NVARCHAR(50)) + ' PC'
+            WHEN Item.InvntryUom = 'KG' THEN REPLACE(CAST(CAST(ISNULL(Fatura.Quantity, 0) AS DECIMAL(18,2)) AS VARCHAR(50)), '.', ',') + ' kg'
+            WHEN Item.InvntryUom = 'M' THEN REPLACE(CAST(CAST(ISNULL(Fatura.Quantity, 0) AS DECIMAL(18,3)) AS VARCHAR(50)), '.', ',') + ' m'
+            ELSE CAST(ISNULL(Fatura.Quantity, 0) AS NVARCHAR(50)) + ' ' + ISNULL(Item.InvntryUom, '')
+        END AS "Quantidade Fat",
+        
+        Item.ItemName AS "Descrição do Item",
+        OrdemProd.DocNum AS "No. Ordem Produção",
+        CASE
+            WHEN OrdemProd.Status = 'P' THEN 'Planejada'
+            WHEN OrdemProd.Status = 'R' THEN 'Liberada'
+            WHEN OrdemProd.Status = 'L' THEN 'Fechada'
+            WHEN OrdemProd.Status = 'C' THEN 'Cancelada'
+            ELSE 'N/A'
+        END AS "Status Ordem Produção",
+        Pedido.CardCode AS "Código Cliente",
+        Pedido.CardName AS "Nome Cliente",
+        ISNULL(Fatura.LineTotal, 0) AS "ValorTotalFaturado",
+        ROW_NUMBER() OVER(PARTITION BY Pedido.DocNum, Item.ItemCode ORDER BY OrdemProd.DocNum DESC) AS RowNum
+    FROM
+        SalesOrders Pedido  -- ← Nome fictício (real: ORDR)
+    LEFT JOIN
+        SalesOrderLines Linha ON Pedido.DocEntry = Linha.DocEntry  -- (real: RDR1)
+    LEFT JOIN
+        Items Item ON Linha.ItemCode = Item.ItemCode  -- (real: OITM)
+    LEFT JOIN
+        ProductionOrders OrdemProd ON CAST(Pedido.DocNum AS NVARCHAR(20)) = OrdemProd.OriginNum  -- (real: OWOR)
+    LEFT JOIN
+        InvoiceLines Fatura ON Linha.DocEntry = Fatura.BaseEntry 
+                           AND Linha.LineNum = Fatura.BaseLine 
+                           AND Fatura.BaseType = 17  -- (real: INV1)
+    WHERE
+        Pedido.CardCode = '[%0]'
+        AND Pedido.DocDate >= '[%1]'
+        AND Pedido.DocDate <= '[%2]'
+)
+
+SELECT
+    "Contem Fatura",
+    "No. Pedido",
+    CONVERT(VARCHAR(10), "Data Pedido", 103) AS "Data Pedido",  -- dd/mm/yyyy
+    "Código do Item",
+    "Quantidade Ped",
+    "Quantidade Fat",
+    "Descrição do Item",
+    "No. Ordem Produção",
+    "Status Ordem Produção",
+    "Código Cliente",
+    "Nome Cliente",
+    'R$ ' + CONVERT(VARCHAR(50), CAST("ValorTotalFaturado" AS MONEY), 1) AS "VALOR TOTAL FATURADO"
+FROM
+    PedidosCTE
+WHERE
+    RowNum = 1
+ORDER BY
+    "No. Pedido" DESC;
