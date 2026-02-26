@@ -1,6 +1,6 @@
 # SAP B1 - Queries de Pedidos → Produção → Faturamento
 
-Esse repositório tem algumas queries SQL que eu criei no SAP Business One pra cruzar pedidos de venda com ordens de produção e ver o que já foi faturado.
+Esse repositório tem uma query SQL que eu criei no SAP Business One pra cruzar pedidos de venda com ordens de produção e ver o que já foi faturado.
 
 Tudo aqui está anonimizado: nomes de tabelas fictícios, nada de dados reais de cliente, empresa ou valores.
 
